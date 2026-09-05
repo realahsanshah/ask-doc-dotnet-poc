@@ -1,0 +1,19 @@
+# .NET build output
+**/bin/
+**/obj/
+**/.vs/
+*.user
+
+# Python
+**/__pycache__/
+*.pyc
+**/.venv/
+
+# Secrets — never commit real .env files, only .env.example
+.env
+**/.env
+!**/.env.example
+
+# IDE
+.vscode/
+.idea/

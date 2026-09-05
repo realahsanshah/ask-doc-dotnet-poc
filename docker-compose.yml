@@ -1,0 +1,53 @@
+# Root-level compose file that runs BOTH services together on a shared
+# Docker network, so you can bring the whole system up with one command:
+#
+#   docker compose up --build
+#
+# Docker Compose automatically creates a private network for this file and
+# registers each service name (e.g. "python-agent") as a DNS hostname other
+# containers on that network can reach — that's how dotnet-api finds
+# python-agent below, instead of using "localhost".
+services:
+  python-agent:
+    build:
+      context: ./PythonAgent
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      # Holds ANTHROPIC_API_KEY / MOCK_LLM. Copy PythonAgent/.env.example to
+      # PythonAgent/.env before running this file (see PythonAgent/README.md).
+      - ./PythonAgent/.env
+    volumes:
+      - ./PythonAgent/data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  dotnet-api:
+    build:
+      # The Dockerfile lives at DotNetApi/DotNetApi/Dockerfile and its COPY
+      # instructions expect the *solution* folder (DotNetApi/) as the build
+      # context, not the project folder — so context/dockerfile are split
+      # like this rather than pointing straight at the project subfolder.
+      context: ./DotNetApi
+      dockerfile: DotNetApi/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      # The base container image doesn't bind to a port by default outside
+      # of Visual Studio's launch profile, so we set it explicitly here.
+      ASPNETCORE_HTTP_PORTS: "8080"
+      # Overrides appsettings.json's PythonAgentSettings:BaseUrl. ASP.NET
+      # Core maps double-underscore env vars to nested config keys, so
+      # "PythonAgentSettings__BaseUrl" == config["PythonAgentSettings:BaseUrl"].
+      # We point at the "python-agent" service name (not localhost) because
+      # each service runs in its own container on the compose network.
+      PythonAgentSettings__BaseUrl: "http://python-agent:8000"
+    depends_on:
+      python-agent:
+        condition: service_healthy
