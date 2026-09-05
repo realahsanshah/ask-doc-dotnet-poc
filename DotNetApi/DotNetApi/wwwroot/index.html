@@ -1,0 +1,166 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Agent Demo — Ask My Docs</title>
+  <style>
+    :root{--bg:#f6f8fb;--card:#ffffff;--accent:#2563eb;--muted:#6b7280;--danger:#dc2626}
+    html,body{height:100%;margin:0;font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:var(--bg); color:#111827}
+    .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:48px 16px}
+    .container{width:100%;max-width:840px;background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.9));box-shadow:0 6px 24px rgba(16,24,40,0.08);border-radius:12px;padding:28px}
+    header{display:flex;align-items:baseline;gap:12px;margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    .subtitle{color:var(--muted);font-size:13px}
+
+    form{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start}
+    textarea{width:100%;min-height:80px;resize:vertical;padding:12px;border-radius:8px;border:1px solid #e6eef8;font-size:15px;box-shadow:inset 0 1px 0 rgba(16,24,40,0.02);line-height:1.4}
+    button{background:var(--accent);color:white;border:none;padding:10px 16px;border-radius:8px;font-weight:600;cursor:pointer}
+    button[disabled]{opacity:0.6;cursor:default}
+
+    .meta{display:flex;gap:12px;align-items:center;margin-top:8px}
+    .example{color:var(--muted);font-size:13px}
+
+    .results{margin-top:20px}
+    .answer-card{background:var(--card);border:1px solid rgba(37,99,235,0.06);padding:18px;border-radius:10px;box-shadow:0 2px 8px rgba(16,24,40,0.04)}
+    .answer-text{font-size:15px;color:#0f172a;white-space:pre-wrap}
+
+    .sources{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px}
+    .source{background:linear-gradient(180deg,#fff,#fbfdff);border:1px solid rgba(15,23,42,0.04);padding:12px;border-radius:8px}
+    .source .src{font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600}
+    .source pre{background:#0f172a10;padding:10px;border-radius:6px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;white-space:pre-wrap}
+
+    .status{margin-left:8px;font-size:13px;color:var(--muted)}
+    .error{color:var(--danger);margin-top:12px}
+
+    /* spinner */
+    .spinner{width:18px;height:18px;border-radius:50%;border:3px solid rgba(0,0,0,0.08);border-top-color:var(--accent);animation:spin 1s linear infinite;display:inline-block;vertical-align:middle}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    @media (max-width:560px){.container{padding:18px}.subtitle{display:block}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <main class="container" role="main">
+      <header>
+        <div>
+          <h1>AI Agent Demo — Ask My Docs</h1>
+          <div class="subtitle">Ask questions about your project's documentation and see sourced answers.</div>
+        </div>
+      </header>
+
+      <form id="askForm" onsubmit="return false;" aria-label="Ask the agent">
+        <textarea id="question" placeholder="e.g., How do I configure logging? Or: 'What endpoints does the API expose?'" aria-label="Question"></textarea>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button id="askBtn" type="button">Ask</button>
+          <div class="meta">
+            <div id="loading" style="display:none"><span class="spinner" aria-hidden="true"></span><span class="status"> Thinking…</span></div>
+          </div>
+        </div>
+      </form>
+
+      <section class="results" aria-live="polite" id="results">
+        <!-- populated dynamically -->
+      </section>
+
+      <div style="margin-top:18px;color:var(--muted);font-size:13px">Tip: press the Ask button after entering a question. Results show the answer and the matched source snippets below.</div>
+    </main>
+  </div>
+
+  <script>
+    (function(){
+      const askBtn = document.getElementById('askBtn');
+      const questionEl = document.getElementById('question');
+      const resultsEl = document.getElementById('results');
+      const loadingEl = document.getElementById('loading');
+
+      function setLoading(loading){
+        if(loading){
+          loadingEl.style.display = 'inline-flex';
+          askBtn.disabled = true;
+        } else {
+          loadingEl.style.display = 'none';
+          askBtn.disabled = false;
+        }
+      }
+
+      function renderError(message){
+        resultsEl.innerHTML = `<div class="error">Error: ${escapeHtml(message)}</div>`;
+      }
+
+      function escapeHtml(s){
+        if(!s) return '';
+        return s.replace(/[&<>"']/g, function(c){
+          return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c];
+        });
+      }
+
+      function renderResponse(data){
+        const answer = data.answer || '(no answer)';
+        const snippets = Array.isArray(data.source_snippets) ? data.source_snippets : [];
+
+        let html = '';
+        html += `<div class="answer-card"><div class="answer-text">${escapeHtml(answer)}</div></div>`;
+
+        if(snippets.length){
+          html += '<div class="sources">';
+          for(const s of snippets){
+            const src = s.source || 'unknown';
+            const snippet = s.snippet || '';
+            html += `<div class="source"><div class="src">${escapeHtml(src)}</div><pre>${escapeHtml(snippet)}</pre></div>`;
+          }
+          html += '</div>';
+        }
+
+        resultsEl.innerHTML = html;
+      }
+
+      async function ask(){
+        const question = questionEl.value.trim();
+        if(!question){
+          renderError('Please enter a question.');
+          return;
+        }
+
+        setLoading(true);
+        resultsEl.innerHTML = ''; // clear previous
+
+        try{
+          const resp = await fetch('/api/agent/ask', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+            body: JSON.stringify({ question })
+          });
+
+          if(!resp.ok){
+            const text = await resp.text();
+            throw new Error(`Server returned ${resp.status} ${resp.statusText} - ${text}`);
+          }
+
+          const json = await resp.json();
+          renderResponse(json);
+
+        }catch(err){
+          console.error(err);
+          renderError(err.message || 'An unknown error occurred');
+        }finally{
+          setLoading(false);
+        }
+      }
+
+      askBtn.addEventListener('click', ask);
+
+      // Support Ctrl+Enter or Cmd+Enter to submit
+      questionEl.addEventListener('keydown', function(e){
+        if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){
+          ask();
+        }
+      });
+
+      // Small UX: show placeholder answer card when first loaded
+      resultsEl.innerHTML = `<div style="color:var(--muted);font-size:14px">Enter a question and click <strong>Ask</strong> to begin.</div>`;
+    })();
+  </script>
+</body>
+</html>
