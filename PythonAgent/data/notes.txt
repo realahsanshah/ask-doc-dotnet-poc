@@ -1,0 +1,9 @@
+Notes: Ask Doc Agent POC
+
+This service is a proof-of-concept for a .NET orchestrator that calls a Python
+FastAPI agent over HTTP to answer questions about a candidate's resume and a
+target job description using retrieval-augmented generation (RAG).
+
+Goal: validate that the candidate's resume experience aligns with the BDO
+Software Developer job description, and answer follow-up questions with
+citations back to the source documents.

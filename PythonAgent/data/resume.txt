@@ -1,0 +1,21 @@
+Ahsan Shah
+Software Engineer
+
+Summary
+Software engineer with experience building full-stack applications using .NET, C#, and Python. Skilled in designing REST APIs, integrating AI/LLM-based services, and working across backend and cloud-adjacent systems.
+
+Experience
+Software Engineer — Autom8ly (2023 - Present)
+- Built and maintained backend services for an SMS compliance platform.
+- Designed REST APIs in .NET/C# consumed by internal and external clients.
+- Integrated third-party AI services into existing .NET applications via HTTP orchestration.
+- Worked on data validation, compliance rule engines, and reporting pipelines.
+
+Skills
+- Languages: C#, Python, JavaScript/TypeScript
+- Frameworks: .NET, FastAPI, ASP.NET Core
+- AI/ML: LangChain, OpenAI API, retrieval-augmented generation (RAG)
+- Tools: Git, Docker, Azure, SQL Server
+
+Education
+Bachelor's Degree in Computer Science
