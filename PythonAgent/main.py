@@ -1,5 +1,6 @@
 """FastAPI app exposing /ask and /health endpoints for the RAG agent."""
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -63,7 +64,12 @@ async def ask(request: AskRequest):
     logger.info("Received question: %s", question)
 
     try:
-        result = rag_service.ask(question)
+        # rag_service.ask() is synchronous (blocking FAISS search + LLM call).
+        # Running it directly here would block FastAPI's single event loop for
+        # the whole request, freezing every other in-flight request (including
+        # /health) until it finishes. asyncio.to_thread offloads it to a worker
+        # thread so the event loop stays free to handle concurrent requests.
+        result = await asyncio.to_thread(rag_service.ask, question)
     except Exception:
         logger.exception("Failed to answer question")
         raise HTTPException(status_code=500, detail="Failed to generate an answer.")
